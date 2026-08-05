@@ -20,8 +20,6 @@ jobs:
     steps:
       - name: Checkout kmp-mobile repository
         uses: actions/checkout@v4
-        with:
-          path: kmp-mobile
 
       - name: Checkout Parikshan framework repository
         uses: actions/checkout@v4
@@ -55,9 +53,7 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: |
-            cd kmp-mobile
-            ./gradlew :shared:e2eAndroidTest -Dorg.gradle.jvmargs="-Xmx4g"
+          script: ./gradlew :shared:e2eAndroidTest -Dorg.gradle.jvmargs="-Xmx4g"
 
       - name: Upload Android E2E Test Results & Artifacts
         if: always()
@@ -65,8 +61,8 @@ jobs:
         with:
           name: android-e2e-results
           path: |
-            kmp-mobile/shared/build/reports/
-            kmp-mobile/shared/build/parikshan/
+            shared/build/reports/
+            shared/build/parikshan/
           if-no-files-found: ignore
 
   e2e-ios:
@@ -77,8 +73,6 @@ jobs:
     steps:
       - name: Checkout kmp-mobile repository
         uses: actions/checkout@v4
-        with:
-          path: kmp-mobile
 
       - name: Checkout Parikshan framework repository
         uses: actions/checkout@v4
@@ -110,11 +104,9 @@ jobs:
           fi
 
       - name: Pre-compile iOS Native Framework
-        working-directory: kmp-mobile
         run: ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64 -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC" -Pparikshan.e2e.active=true
 
       - name: Run iOS E2E Tests
-        working-directory: kmp-mobile
         run: ./gradlew :shared:e2eIosTest -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC" -Dparikshan.xcodebuild.timeout=1800
 
       - name: Upload iOS E2E Test Results & Artifacts
@@ -123,6 +115,6 @@ jobs:
         with:
           name: ios-e2e-results
           path: |
-            kmp-mobile/shared/build/reports/
-            kmp-mobile/shared/build/parikshan/
+            shared/build/reports/
+            shared/build/parikshan/
           if-no-files-found: ignore

@@ -34,6 +34,12 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
@@ -41,17 +47,12 @@ jobs:
         working-directory: parikshan
         run: ./gradlew publishToMavenLocal -Dorg.gradle.jvmargs="-Xmx4g"
 
-      - name: Enable KVM for Android Emulator acceleration
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-nodes.rules
-          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
-
       - name: Run Android E2E Tests on Emulator
-        uses: ReactiveCircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
-          arch: x86_64
-          target: google_apis
+          api-level: 29
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./gradlew :shared:e2eAndroidTest -Dorg.gradle.jvmargs="-Xmx4g"
 
@@ -87,6 +88,13 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
+      - name: Cache Kotlin/Native (~/.konan)
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('**/*.gradle*', 'gradle/libs.versions.toml', '**/gradle-wrapper.properties') }}
+          restore-keys: konan-${{ runner.os }}-
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
@@ -94,14 +102,10 @@ jobs:
         working-directory: parikshan
         run: ./gradlew publishToMavenLocal -Dorg.gradle.jvmargs="-Xmx6g"
 
-      - name: Boot Available iOS Simulator
+      - name: Pre-boot Simulator
         run: |
-          xcrun simctl list devices available
-          SIM_UDID=$(xcrun simctl list devices available | grep -i "iPhone" | grep -oE '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}' | head -n 1)
-          if [ -n "$SIM_UDID" ]; then
-            echo "Booting iOS Simulator UDID: $SIM_UDID"
-            xcrun simctl boot "$SIM_UDID" || true
-          fi
+          xcrun simctl list devices
+          xcrun simctl boot "iPhone 15" || true
 
       - name: Pre-compile iOS Native Framework
         run: ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64 -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC" -Pparikshan.e2e.active=true

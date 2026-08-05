@@ -1,0 +1,128 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-android:
+    name: E2E Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout kmp-mobile repository
+        uses: actions/checkout@v4
+        with:
+          path: kmp-mobile
+
+      - name: Checkout Parikshan framework repository
+        uses: actions/checkout@v4
+        with:
+          repository: aryapreetam/parikshan
+          ref: fix/gradle-plugin-target-resolution-issues-12-13
+          path: parikshan
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build & Publish Parikshan 0.0.7 to Maven Local
+        working-directory: parikshan
+        run: ./gradlew publishToMavenLocal -Dorg.gradle.jvmargs="-Xmx4g"
+
+      - name: Enable KVM for Android Emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-nodes.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+
+      - name: Run Android E2E Tests on Emulator
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            cd kmp-mobile
+            ./gradlew :shared:e2eAndroidTest -Dorg.gradle.jvmargs="-Xmx4g"
+
+      - name: Upload Android E2E Test Results & Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-e2e-results
+          path: |
+            kmp-mobile/shared/build/reports/
+            kmp-mobile/shared/build/parikshan/
+          if-no-files-found: ignore
+
+  e2e-ios:
+    name: E2E iOS
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout kmp-mobile repository
+        uses: actions/checkout@v4
+        with:
+          path: kmp-mobile
+
+      - name: Checkout Parikshan framework repository
+        uses: actions/checkout@v4
+        with:
+          repository: aryapreetam/parikshan
+          ref: fix/gradle-plugin-target-resolution-issues-12-13
+          path: parikshan
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build & Publish Parikshan 0.0.7 to Maven Local
+        working-directory: parikshan
+        run: ./gradlew publishToMavenLocal -Dorg.gradle.jvmargs="-Xmx6g"
+
+      - name: Boot Available iOS Simulator
+        run: |
+          xcrun simctl list devices available
+          SIM_UDID=$(xcrun simctl list devices available | grep -i "iPhone" | grep -oE '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}' | head -n 1)
+          if [ -n "$SIM_UDID" ]; then
+            echo "Booting iOS Simulator UDID: $SIM_UDID"
+            xcrun simctl boot "$SIM_UDID" || true
+          fi
+
+      - name: Pre-compile iOS Native Framework
+        working-directory: kmp-mobile
+        run: ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64 -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC" -Pparikshan.e2e.active=true
+
+      - name: Run iOS E2E Tests
+        working-directory: kmp-mobile
+        run: ./gradlew :shared:e2eIosTest -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC" -Dparikshan.xcodebuild.timeout=1800
+
+      - name: Upload iOS E2E Test Results & Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-e2e-results
+          path: |
+            kmp-mobile/shared/build/reports/
+            kmp-mobile/shared/build/parikshan/
+          if-no-files-found: ignore

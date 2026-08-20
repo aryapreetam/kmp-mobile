@@ -25,7 +25,6 @@ jobs:
       #   uses: actions/checkout@v4
       #   with:
       #     repository: aryapreetam/parikshan
-      #     ref: fix/gradle-plugin-target-resolution-issues-12-13
       #     path: parikshan
 
       - name: Set up JDK 21
@@ -79,7 +78,6 @@ jobs:
       #   uses: actions/checkout@v4
       #   with:
       #     repository: aryapreetam/parikshan
-      #     ref: fix/gradle-plugin-target-resolution-issues-12-13
       #     path: parikshan
 
       - name: Set up JDK 21

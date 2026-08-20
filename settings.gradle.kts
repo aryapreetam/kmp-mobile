@@ -1,6 +1,7 @@
 rootProject.name = "kmp-mobile"
 
 pluginManagement {
+    // includeBuild("/Users/preetam/workspace/parikshan/gradle-plugins")
     repositories {
         mavenLocal()
         google {
@@ -28,6 +29,8 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
+
+// includeBuild("/Users/preetam/workspace/parikshan")
 
 include(":androidApp")
 include(":shared")

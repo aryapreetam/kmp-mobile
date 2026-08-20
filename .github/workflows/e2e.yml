@@ -100,11 +100,6 @@ jobs:
       #   working-directory: parikshan
       #   run: ./gradlew publishToMavenLocal -Dorg.gradle.jvmargs="-Xmx6g"
 
-      - name: Pre-boot Simulator
-        run: |
-          xcrun simctl list devices
-          xcrun simctl boot "iPhone 15" || true
-
       - name: Pre-compile iOS Native Framework
         run: ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64 -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC" -Pparikshan.e2e.active=true
 

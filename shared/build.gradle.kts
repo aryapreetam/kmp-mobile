@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    id("io.github.aryapreetam.parikshan") version "0.0.8"
+    id("io.github.aryapreetam.parikshan") version "0.0.9"
 }
 
 kotlin {

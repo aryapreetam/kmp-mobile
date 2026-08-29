@@ -4,14 +4,15 @@ A Kotlin Multiplatform mobile application targeting Android and iOS, configured 
 
 ---
 
-## Branch Selection by Mac Architecture
+## Unified Multi-Version Support
 
-Select the appropriate branch based on your host development environment:
+This project uses **dynamic version catalogs** on the `main` branch to support multiple Compose Multiplatform (CMP) and Kotlin versions seamlessly without needing separate git branches:
 
-| Host Architecture | Recommended Branch | Compose Multiplatform | Kotlin |
-| :--- | :--- | :--- | :--- |
-| **Apple Silicon (M1 / M2 / M3 / M4, `arm64`)** | `main` | `1.11.0+` | `2.4.0` |
-| **Intel Macs (`x86_64`)** | `check-cmp-1.10.1` | `1.10.1` | `2.3.21` |
+| Profile | Compose Multiplatform | Kotlin | Lifecycle | Target Support |
+| :--- | :--- | :--- | :--- | :--- |
+| **`1.10` (Default)** | `1.10.1` | `2.3.21` | `2.9.6` | Android & iOS (Intel `x86_64` + Apple Silicon `arm64`) |
+| **`1.11`** | `1.11.1` | `2.4.10` | `2.11.0-beta01` | Android (Local) & iOS (Apple Silicon CI) |
+| **`1.12`** | `1.12.0` | `2.4.0` | `2.11.0` | Android (Local) & iOS (Apple Silicon CI) |
 
 ---
 
@@ -24,24 +25,32 @@ git clone https://github.com/aryapreetam/kmp-mobile.git
 cd kmp-mobile
 ```
 
-If you are running on an Intel Mac, switch to the `check-cmp-1.10.1` branch:
-```bash
-git checkout check-cmp-1.10.1
-```
-
 ### 2. Run E2E Tests
 
 Run automated tests across all configured mobile targets:
 
 ```bash
-# Run all mobile E2E tests (Android + iOS)
+# Run baseline E2E tests (defaults to CMP 1.10.1, runs Android + iOS locally)
 ./gradlew e2eTest
 
-# Run tests targeting Android only (boots emulator automatically if connected)
+# Run on specific CMP profiles
+./gradlew e2eTest -PcmpProfile=1.10
+./gradlew e2eTest --targets=android -PcmpProfile=1.11
+./gradlew e2eTest --targets=android -PcmpProfile=1.12
+
+# Run targeting Android only
 ./gradlew :shared:e2eAndroidTest
 
-# Run tests targeting iOS only (boots iOS simulator automatically on macOS)
+# Run targeting iOS only (on macOS)
 ./gradlew :shared:e2eIosTest
+```
+
+### 3. Verify Entire CMP Matrix Locally
+
+You can execute the automated all-in-one verification script to test across all CMP profiles:
+
+```bash
+./scripts/verify-all-cmp.sh
 ```
 
 ---
@@ -50,6 +59,7 @@ Run automated tests across all configured mobile targets:
 
 * [`androidApp/`](./androidApp) — Native Android application entry point.
 * [`iosApp/`](./iosApp) — Native Xcode project and SwiftUI iOS entry point.
+* [`scripts/`](./scripts) — Matrix verification scripts (`verify-all-cmp.sh`).
 * [`shared/`](./shared) — Shared Compose Multiplatform UI and E2E test suites:
   * [`shared/src/commonMain`](./shared/src/commonMain/kotlin) — Shared application code and screens.
   * [`shared/src/commonTest`](./shared/src/commonTest/kotlin) — Intent-based cross-platform E2E tests (`e2eTest { ... }`).

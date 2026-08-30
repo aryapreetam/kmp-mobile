@@ -42,7 +42,7 @@ jobs:
       - name: Create and Start Android 17 Emulator
         run: |
           echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-37.0;google_apis;arm64-v8a" --force
-          $ANDROID_HOME/emulator/emulator -avd test_avd -no-window -no-audio -no-snapshot -gpu swiftshader_indirect &
+          nohup $ANDROID_HOME/emulator/emulator -avd test_avd -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > /dev/null 2>&1 &
           $ANDROID_HOME/platform-tools/adb wait-for-device shell 'while [[ "$(getprop sys.boot_completed)" != "1" ]]; do sleep 2; done'
           echo "Emulator booted successfully! Android Version:"
           $ANDROID_HOME/platform-tools/adb shell getprop ro.build.version.release

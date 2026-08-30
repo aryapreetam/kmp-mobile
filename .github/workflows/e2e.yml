@@ -48,7 +48,7 @@ jobs:
 
       - name: Create and Start Android 17 Emulator
         run: |
-          echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-37.0;google_apis;x86_64" --force
+          $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-37.0;google_apis;x86_64" --device "pixel_7" --force
           echo "hw.ramSize=4096" >> ~/.android/avd/test_avd.avd/config.ini
           echo "disk.dataPartition.size=4096M" >> ~/.android/avd/test_avd.avd/config.ini
           echo "hw.cpu.ncore=2" >> ~/.android/avd/test_avd.avd/config.ini

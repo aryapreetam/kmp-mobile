@@ -14,7 +14,7 @@ concurrency:
 jobs:
   e2e-android-17:
     name: E2E Android 17 (CMP ${{ matrix.profile }})
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -31,22 +31,29 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo chmod 777 /dev/kvm || true
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
       - name: Install Android 17 SDK & System Image
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --channel=3 "platforms;android-37.0" "system-images;android-37.0;google_apis;arm64-v8a" "emulator" "platform-tools"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --channel=3 "platforms;android-37.0" "system-images;android-37.0;google_apis;x86_64" "emulator" "platform-tools"
 
       - name: Create and Start Android 17 Emulator
         run: |
-          echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-37.0;google_apis;arm64-v8a" --force
+          echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-37.0;google_apis;x86_64" --force
           echo "hw.ramSize=4096" >> ~/.android/avd/test_avd.avd/config.ini
           echo "disk.dataPartition.size=4096M" >> ~/.android/avd/test_avd.avd/config.ini
-          echo "vm.heapSize=576" >> ~/.android/avd/test_avd.avd/config.ini
+          echo "hw.cpu.ncore=2" >> ~/.android/avd/test_avd.avd/config.ini
           
-          echo "Starting Android 17 emulator in background..."
+          echo "Starting Android 17 emulator with KVM in background..."
           $ANDROID_HOME/emulator/emulator -avd test_avd -no-window -no-audio -no-boot-anim -no-snapshot -camera-back none -gpu swiftshader_indirect > emulator.log 2>&1 &
           
           echo "Waiting for emulator to boot..."

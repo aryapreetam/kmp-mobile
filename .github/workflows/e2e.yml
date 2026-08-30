@@ -48,13 +48,11 @@ jobs:
 
       - name: Create and Start Android 17 Emulator
         run: |
-          $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-37.0;google_apis;x86_64" --device "pixel_7" --force
-          echo "hw.ramSize=4096" >> ~/.android/avd/test_avd.avd/config.ini
-          echo "disk.dataPartition.size=4096M" >> ~/.android/avd/test_avd.avd/config.ini
-          echo "hw.cpu.ncore=2" >> ~/.android/avd/test_avd.avd/config.ini
+          mkdir -p ~/.android/avd
+          $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-37.0;google_apis;x86_64" --device "pixel_7" -c 4096M -p "$HOME/.android/avd/test_avd.avd" --force
           
           echo "Starting Android 17 emulator with KVM in background..."
-          $ANDROID_HOME/emulator/emulator -avd test_avd -no-window -no-audio -no-boot-anim -no-snapshot -camera-back none -gpu swiftshader_indirect > emulator.log 2>&1 &
+          $ANDROID_HOME/emulator/emulator -avd test_avd -no-window -no-audio -no-boot-anim -no-snapshot -camera-back none -gpu swiftshader_indirect -memory 4096 > emulator.log 2>&1 &
           
           echo "Waiting for emulator to boot..."
           for i in {1..60}; do

@@ -44,34 +44,56 @@ jobs:
       - name: Install Android 17 SDK & System Image
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --channel=3 "platforms;android-37.0" "system-images;android-37.0;google_apis;x86_64" "emulator" "platform-tools"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --channel=3 \
+            "platforms;android-37.0" \
+            "system-images;android-37.0;google_apis;x86_64" \
+            "emulator" \
+            "platform-tools"
 
-      - name: Create and Start Android 17 Emulator
+      - name: Create and Boot Android 17 Emulator
         run: |
+          # Ensure default AVD home exists
           mkdir -p ~/.android/avd
-          $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n test_avd -k "system-images;android-37.0;google_apis;x86_64" --device "pixel_7" -c 4096M -p "$HOME/.android/avd/test_avd.avd" --force
-          
-          echo "Starting Android 17 emulator with KVM in background..."
-          $ANDROID_HOME/emulator/emulator -avd test_avd -no-window -no-audio -no-boot-anim -no-snapshot -camera-back none -gpu swiftshader_indirect -memory 4096 > emulator.log 2>&1 &
-          
-          echo "Waiting for emulator to boot..."
-          for i in {1..60}; do
+
+          # Create AVD (no -p flag so avdmanager writes both .ini and .avd/ in default location)
+          echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd \
+            -n test_avd \
+            -k "system-images;android-37.0;google_apis;x86_64" \
+            --force
+
+          # Verify AVD was created
+          echo "=== AVD files ==="
+          ls -la ~/.android/avd/
+          echo "=== AVD list ==="
+          $ANDROID_HOME/emulator/emulator -list-avds
+
+          # Boot emulator with KVM
+          $ANDROID_HOME/emulator/emulator -avd test_avd \
+            -no-window -no-audio -no-boot-anim -no-snapshot \
+            -camera-back none -gpu swiftshader_indirect -memory 4096 \
+            > emulator.log 2>&1 &
+
+          # Wait for boot with progress reporting
+          for i in $(seq 1 90); do
             BOOTED=$($ANDROID_HOME/platform-tools/adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
             if [ "$BOOTED" = "1" ]; then
-              echo "Emulator booted successfully after $((i * 5)) seconds!"
+              echo "Emulator booted after $((i * 5))s"
               break
             fi
-            echo "Waiting for boot... ($((i * 5))s elapsed)"
+            if [ $((i % 6)) -eq 0 ]; then
+              echo "Still waiting... ($((i * 5))s elapsed)"
+            fi
             sleep 5
           done
 
           if [ "$BOOTED" != "1" ]; then
-            echo "Emulator failed to boot in time. Emulator logs:"
+            echo "::error::Emulator failed to boot. Logs:"
             cat emulator.log
             exit 1
           fi
 
-          echo "Android Version: $($ANDROID_HOME/platform-tools/adb shell getprop ro.build.version.release)"
+          $ANDROID_HOME/platform-tools/adb shell getprop ro.build.version.release
+          $ANDROID_HOME/platform-tools/adb shell getprop ro.build.version.sdk
 
       - name: Run Android E2E Tests on Android 17
         run: ./gradlew :shared:e2eAndroidTest -PcmpProfile=${{ matrix.profile }} -Dorg.gradle.jvmargs="-Xmx4g"

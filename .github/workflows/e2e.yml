@@ -99,6 +99,11 @@ jobs:
           echo "=== Verify installed ==="
           ls -d $ANDROID_HOME/system-images/android-37*/*/* 2>/dev/null || echo "system-images dir not found"
 
+          # Add Android SDK tools to GITHUB_PATH for all subsequent steps
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+
       - name: Create Android 17 emulator
         shell: bash
         run: |
@@ -161,7 +166,7 @@ jobs:
           cat "$HOME/.android/avd/${AVD_NAME}.avd/config.ini"
 
           echo "=== AVD list ==="
-          "$ANDROID_HOME/emulator/emulator" -list-avds
+          emulator -list-avds
 
       - name: Boot Android 17 emulator
         shell: bash
@@ -169,17 +174,16 @@ jobs:
           set -e
 
           AVD_NAME="android17"
-          EMULATOR="$ANDROID_HOME/emulator/emulator"
 
           echo "=== Emulator version ==="
-          "$EMULATOR" -version
+          emulator -version
 
           echo "=== KVM ==="
           ls -la /dev/kvm || true
 
           echo "=== Starting emulator ==="
 
-          nohup "$EMULATOR" \
+          nohup emulator \
             -avd "$AVD_NAME" \
             -no-window \
             -no-audio \
@@ -198,16 +202,16 @@ jobs:
 
           echo "=== Waiting for ADB device ==="
 
-          "$ANDROID_HOME/platform-tools/adb" start-server
+          adb start-server
 
-          timeout 120 \
-            "$ANDROID_HOME/platform-tools/adb" wait-for-device
+          timeout 120 adb wait-for-device
 
           echo "ADB device detected."
 
           echo "=== Waiting for Android boot ==="
 
           timeout 300 bash -c '
+            export PATH="'"$ANDROID_HOME"'/platform-tools:$PATH"
             while true; do
               BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")
 

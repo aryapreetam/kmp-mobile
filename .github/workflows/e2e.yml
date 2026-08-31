@@ -102,26 +102,63 @@ jobs:
           set -e
 
           AVD_NAME="android17"
-          AVD_PACKAGE="system-images;android-37.0;google_apis;x86_64"
+          SYS_IMG_DIR="system-images/android-37.0/google_apis/x86_64"
 
-          mkdir -p "$HOME/.android/avd"
+          # Create AVD directory and files manually.
+          # avdmanager silently fails with android-37.0 even on cmdline-tools v20+.
+          mkdir -p "$HOME/.android/avd/${AVD_NAME}.avd"
 
-          echo "=== Existing AVDs ==="
-          "$ANDROID_HOME/emulator/emulator" -list-avds || true
+          cat > "$HOME/.android/avd/${AVD_NAME}.ini" << AVDINI
+          avd.ini.encoding=UTF-8
+          path=$HOME/.android/avd/${AVD_NAME}.avd
+          path.rel=avd/${AVD_NAME}.avd
+          target=android-37
+          AVDINI
+          # Remove leading whitespace from heredoc
+          sed -i 's/^[[:space:]]*//' "$HOME/.android/avd/${AVD_NAME}.ini"
 
-          echo "=== Creating AVD ==="
+          cat > "$HOME/.android/avd/${AVD_NAME}.avd/config.ini" << CFGINI
+          AvdId=${AVD_NAME}
+          PlayStore.enabled=false
+          abi.type=x86_64
+          avd.ini.displayname=${AVD_NAME}
+          avd.ini.encoding=UTF-8
+          disk.dataPartition.size=4096M
+          hw.accelerometer=yes
+          hw.audioInput=no
+          hw.battery=yes
+          hw.cpu.arch=x86_64
+          hw.cpu.ncore=2
+          hw.dPad=no
+          hw.device.manufacturer=Google
+          hw.device.name=pixel_6
+          hw.gps=yes
+          hw.gpu.enabled=yes
+          hw.gpu.mode=swiftshader_indirect
+          hw.keyboard=yes
+          hw.lcd.density=420
+          hw.lcd.height=2400
+          hw.lcd.width=1080
+          hw.mainKeys=no
+          hw.ramSize=4096
+          hw.sdCard=no
+          hw.sensors.orientation=yes
+          hw.sensors.proximity=yes
+          hw.trackBall=no
+          image.sysdir.1=${ANDROID_HOME}/${SYS_IMG_DIR}/
+          tag.display=Google APIs
+          tag.id=google_apis
+          CFGINI
+          sed -i 's/^[[:space:]]*//' "$HOME/.android/avd/${AVD_NAME}.avd/config.ini"
 
-          echo "no" | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
-            --force \
-            --name "$AVD_NAME" \
-            --package "$AVD_PACKAGE" \
-            --device "pixel_6"
+          echo "=== AVD ini ==="
+          cat "$HOME/.android/avd/${AVD_NAME}.ini"
 
-          echo "=== Created AVD ==="
-          "$ANDROID_HOME/emulator/emulator" -list-avds
-
-          echo "=== AVD configuration ==="
+          echo "=== AVD config ==="
           cat "$HOME/.android/avd/${AVD_NAME}.avd/config.ini"
+
+          echo "=== AVD list ==="
+          "$ANDROID_HOME/emulator/emulator" -list-avds
 
       - name: Boot Android 17 emulator
         shell: bash

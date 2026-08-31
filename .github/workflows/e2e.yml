@@ -2,9 +2,14 @@ name: E2E Tests
 
 on:
   push:
-    branches: [ main, master, 'test-*' ]
+    branches:
+      - main
+      - master
+      - 'test-*'
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 concurrency:
@@ -15,11 +20,13 @@ jobs:
   e2e-android-17:
     name: E2E Android 17 (CMP ${{ matrix.profile }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+
     strategy:
       fail-fast: false
       matrix:
-        profile: ['1.10']
+        profile:
+          - '1.10'
 
     steps:
       - name: Checkout kmp-mobile repository
@@ -28,75 +35,185 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: zulu
           java-version: '21'
 
       - name: Enable KVM
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          sudo chmod 777 /dev/kvm || true
+          echo "=== KVM ==="
+          ls -la /dev/kvm || true
+
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            echo "KVM is available"
+          else
+            echo "::warning::/dev/kvm is not available"
+          fi
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Install Android 17 SDK & System Image
+      - name: Install Android 17 SDK and emulator
+        shell: bash
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --channel=3 \
-            "platforms;android-37.0" \
-            "system-images;android-37.0;google_apis;x86_64" \
+          set -e
+
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+          echo "=== SDK Manager ==="
+          "$SDKMANAGER" --version
+
+          echo "=== Android 37 packages available ==="
+          "$SDKMANAGER" --list | grep -E \
+            'platforms;android-37|system-images;android-37' || true
+
+          echo "=== Accept licenses ==="
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+
+          echo "=== Install packages ==="
+          "$SDKMANAGER" \
+            "platform-tools" \
             "emulator" \
-            "platform-tools"
+            "platforms;android-37.0" \
+            "system-images;android-37.0;google_apis;x86_64"
 
-      - name: Create and Boot Android 17 Emulator
+      - name: Create Android 17 emulator
+        shell: bash
         run: |
-          # Ensure default AVD home exists
-          mkdir -p ~/.android/avd
+          set -e
 
-          # Create AVD (no -p flag so avdmanager writes both .ini and .avd/ in default location)
-          echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd \
-            -n test_avd \
-            -k "system-images;android-37.0;google_apis;x86_64" \
-            --force
+          AVD_NAME="android17"
+          AVD_PACKAGE="system-images;android-37.0;google_apis;x86_64"
 
-          # Verify AVD was created
-          echo "=== AVD files ==="
-          ls -la ~/.android/avd/
-          echo "=== AVD list ==="
-          $ANDROID_HOME/emulator/emulator -list-avds
+          mkdir -p "$HOME/.android/avd"
 
-          # Boot emulator with KVM
-          $ANDROID_HOME/emulator/emulator -avd test_avd \
-            -no-window -no-audio -no-boot-anim -no-snapshot \
-            -camera-back none -gpu swiftshader_indirect -memory 4096 \
+          echo "=== Existing AVDs ==="
+          "$ANDROID_HOME/emulator/emulator" -list-avds || true
+
+          echo "=== Creating AVD ==="
+
+          echo "no" | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+            --force \
+            --name "$AVD_NAME" \
+            --package "$AVD_PACKAGE" \
+            --device "pixel_6"
+
+          echo "=== Created AVD ==="
+          "$ANDROID_HOME/emulator/emulator" -list-avds
+
+          echo "=== AVD configuration ==="
+          cat "$HOME/.android/avd/${AVD_NAME}.avd/config.ini"
+
+      - name: Boot Android 17 emulator
+        shell: bash
+        run: |
+          set -e
+
+          AVD_NAME="android17"
+          EMULATOR="$ANDROID_HOME/emulator/emulator"
+
+          echo "=== Emulator version ==="
+          "$EMULATOR" -version
+
+          echo "=== KVM ==="
+          ls -la /dev/kvm || true
+
+          echo "=== Starting emulator ==="
+
+          nohup "$EMULATOR" \
+            -avd "$AVD_NAME" \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-snapshot \
+            -camera-back none \
+            -gpu swiftshader \
+            -cores 2 \
+            -memory 2048 \
             > emulator.log 2>&1 &
 
-          # Wait for boot with progress reporting
-          for i in $(seq 1 90); do
-            BOOTED=$($ANDROID_HOME/platform-tools/adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
-            if [ "$BOOTED" = "1" ]; then
-              echo "Emulator booted after $((i * 5))s"
-              break
-            fi
-            if [ $((i % 6)) -eq 0 ]; then
-              echo "Still waiting... ($((i * 5))s elapsed)"
-            fi
-            sleep 5
-          done
+          EMULATOR_PID=$!
+          echo "$EMULATOR_PID" > emulator.pid
 
-          if [ "$BOOTED" != "1" ]; then
-            echo "::error::Emulator failed to boot. Logs:"
-            cat emulator.log
-            exit 1
-          fi
+          echo "Emulator PID: $EMULATOR_PID"
 
-          $ANDROID_HOME/platform-tools/adb shell getprop ro.build.version.release
-          $ANDROID_HOME/platform-tools/adb shell getprop ro.build.version.sdk
+          echo "=== Waiting for ADB device ==="
+
+          "$ANDROID_HOME/platform-tools/adb" start-server
+
+          timeout 120 \
+            "$ANDROID_HOME/platform-tools/adb" wait-for-device
+
+          echo "ADB device detected."
+
+          echo "=== Waiting for Android boot ==="
+
+          timeout 300 bash -c '
+            while true; do
+              BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")
+
+              if [ "$BOOT_COMPLETED" = "1" ]; then
+                echo "Android boot completed."
+                break
+              fi
+
+              echo "Waiting for Android boot..."
+              sleep 5
+            done
+          '
+
+          echo "=== Disable animations ==="
+
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+
+          echo "=== Android information ==="
+
+          adb shell getprop ro.build.version.release
+          adb shell getprop ro.build.version.sdk
+          adb shell getprop ro.product.cpu.abi
+
+          echo "=== Connected devices ==="
+
+          adb devices -l
+
+          echo "=== Emulator ready ==="
 
       - name: Run Android E2E Tests on Android 17
-        run: ./gradlew :shared:e2eAndroidTest -PcmpProfile=${{ matrix.profile }} -Dorg.gradle.jvmargs="-Xmx4g"
+        run: |
+          ./gradlew \
+            :shared:e2eAndroidTest \
+            -PcmpProfile=${{ matrix.profile }} \
+            -Dorg.gradle.jvmargs="-Xmx4g"
+
+      - name: Dump emulator diagnostics
+        if: always()
+        shell: bash
+        run: |
+          echo "========================================"
+          echo "ADB DEVICES"
+          echo "========================================"
+          adb devices -l || true
+
+          echo "========================================"
+          echo "EMULATOR PROCESS"
+          echo "========================================"
+          ps aux | grep '[e]mulator' || true
+
+          echo "========================================"
+          echo "EMULATOR LOG"
+          echo "========================================"
+          if [ -f emulator.log ]; then
+            cat emulator.log
+          else
+            echo "emulator.log does not exist"
+          fi
+
+          echo "========================================"
+          echo "ADB LOGCAT"
+          echo "========================================"
+          adb logcat -d -t 500 || true
 
       - name: Upload Android E2E Test Results & Artifacts
         if: always()
@@ -106,4 +223,5 @@ jobs:
           path: |
             shared/build/reports/
             shared/build/parikshan/
+            emulator.log
           if-no-files-found: ignore

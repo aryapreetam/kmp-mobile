@@ -105,8 +105,7 @@ jobs:
             --force \
             --name "$AVD_NAME" \
             --package "$AVD_PACKAGE" \
-            --device "pixel_6" \
-            -v 2>&1
+            --device "pixel_6"
 
           echo "=== Created AVD ==="
           "$ANDROID_HOME/emulator/emulator" -list-avds

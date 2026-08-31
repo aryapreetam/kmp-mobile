@@ -69,6 +69,16 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
           "$SDKMANAGER" --channel=3 "cmdline-tools;latest"
 
+          # sdkmanager installs to "latest-2" when "latest" already exists.
+          # Swap so all subsequent $ANDROID_HOME/cmdline-tools/latest/ references use the new version.
+          if [ -d "$ANDROID_HOME/cmdline-tools/latest-2" ]; then
+            echo "Swapping cmdline-tools: latest -> old, latest-2 -> latest"
+            mv "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/cmdline-tools/old"
+            mv "$ANDROID_HOME/cmdline-tools/latest-2" "$ANDROID_HOME/cmdline-tools/latest"
+          fi
+
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
           echo "=== Updated SDK Manager version ==="
           "$SDKMANAGER" --version
 

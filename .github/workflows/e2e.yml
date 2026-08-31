@@ -38,7 +38,7 @@ jobs:
           distribution: zulu
           java-version: '21'
 
-      - name: Enable KVM
+      - name: Enable KVM and install emulator dependencies
         run: |
           echo "=== KVM ==="
           ls -la /dev/kvm || true
@@ -49,6 +49,9 @@ jobs:
           else
             echo "::warning::/dev/kvm is not available"
           fi
+
+          # Emulator links against libpulse even with -no-audio
+          sudo apt-get update -qq && sudo apt-get install -y -qq libpulse0 > /dev/null
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3

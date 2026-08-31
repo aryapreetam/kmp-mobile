@@ -60,22 +60,31 @@ jobs:
 
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
-          echo "=== SDK Manager ==="
+          echo "=== Pre-installed SDK Manager version ==="
+          "$SDKMANAGER" --version
+
+          # cmdline-tools < v20.0 cannot handle android-37.0 minor versioning.
+          # Update to latest first, using canary channel (--channel=3).
+          echo "=== Updating cmdline-tools to latest (v20+) ==="
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" --channel=3 "cmdline-tools;latest"
+
+          echo "=== Updated SDK Manager version ==="
           "$SDKMANAGER" --version
 
           echo "=== Android 37 packages available ==="
-          "$SDKMANAGER" --list | grep -E \
+          "$SDKMANAGER" --channel=3 --list | grep -E \
             'platforms;android-37|system-images;android-37' || true
 
-          echo "=== Accept licenses ==="
-          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-
           echo "=== Install packages ==="
-          "$SDKMANAGER" \
+          "$SDKMANAGER" --channel=3 \
             "platform-tools" \
             "emulator" \
             "platforms;android-37.0" \
             "system-images;android-37.0;google_apis;x86_64"
+
+          echo "=== Verify installed ==="
+          ls -d $ANDROID_HOME/system-images/android-37*/*/* 2>/dev/null || echo "system-images dir not found"
 
       - name: Create Android 17 emulator
         shell: bash
@@ -96,7 +105,8 @@ jobs:
             --force \
             --name "$AVD_NAME" \
             --package "$AVD_PACKAGE" \
-            --device "pixel_6"
+            --device "pixel_6" \
+            -v 2>&1
 
           echo "=== Created AVD ==="
           "$ANDROID_HOME/emulator/emulator" -list-avds
